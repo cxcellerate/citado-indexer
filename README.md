@@ -1,8 +1,31 @@
 # citado-indexer
 
+![License: MIT](https://img.shields.io/badge/License-MIT-C4872A.svg)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Zero dependencies](https://img.shields.io/badge/deps-0-brightgreen.svg)
+![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
 > Motor de auto-indexação para sites na borda (Cloudflare Workers): o site se mantém **indexado e atualizado no Google, no Bing — e nas IAs que consultam esses índices — sozinho**, toda semana, sem ação manual.
 
 Criado pela [Citado](https://citado.app.br) — sites otimizados para buscadores e para IAs generativas (GEO), por Virginia Marçal.
+
+**TL;DR** — Um Cloudflare Worker que, toda semana, lê o `sitemap.xml` dos seus sites, avisa os buscadores via IndexNow e reenvia o sitemap ao Bing. Roda no plano gratuito, sem servidor e sem dependências. Você faz deploy uma vez; ele mantém tudo indexado sozinho.
+
+```
+┌─────────────┐   toda segunda    ┌──────────────┐
+│   Cron      │ ────────────────▶ │ lê sitemap   │
+│  (semanal)  │                   │ de cada site │
+└─────────────┘                   └──────┬───────┘
+                                         │
+                    ┌────────────────────┼────────────────────┐
+                    ▼                     ▼                     ▼
+            ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+            │  IndexNow    │     │ Bing Webmaster│     │  log do      │
+            │ (Bing→ChatGPT)│    │ (reenvio      │     │  resultado   │
+            │              │     │  sitemap)     │     │              │
+            └──────────────┘     └──────────────┘     └──────────────┘
+```
 
 ## O problema que ele resolve
 
@@ -25,6 +48,32 @@ O motor roda **dentro da própria infraestrutura do site** (Cloudflare Worker co
 **Regra de ouro:** o motor nunca pode quebrar nada — cada site roda em `try/catch` e falha vira registro de log, jamais erro.
 
 Este repositório traz a variante **central** (um Worker que varre uma lista de sites — ideal para sites estáticos em Pages/Vercel, que não têm cron próprio). A variante **embutida** (o motor dentro do Worker do próprio site, com ping imediato a cada mudança de conteúdo publicada no painel) segue a mesma lógica; um exemplo dela em produção está descrito em [citado.app.br/indexacao-automatica](https://citado.app.br/indexacao-automatica).
+
+## Exemplo de saída
+
+Cada varredura (agendada ou disparada manualmente via `GET /run?token=…`) retorna e registra um relatório por site — dá para ver o motor trabalhando, não só confiar que ele existe:
+
+```json
+{
+  "ok": true,
+  "quando": "2026-07-13T07:41:43.231Z",
+  "resultados": [
+    { "host": "citado.app.br",          "urls": 8, "indexnow": "HTTP 202", "bing": "HTTP 200", "erro": null },
+    { "host": "www.gestaodecmv.com.br", "urls": 7, "indexnow": "HTTP 202", "bing": "HTTP 200", "erro": null }
+  ]
+}
+```
+
+- **`urls`** — quantas URLs o motor leu do `sitemap.xml` daquele site.
+- **`indexnow`** — `HTTP 202` = aceito (o IndexNow confirma o recebimento; `429` significa que as mesmas URLs foram enviadas há pouco — inofensivo).
+- **`bing`** — `HTTP 200` = sitemap reenviado ao Bing Webmaster com sucesso.
+- **`erro`** — `null` quando tudo correu bem; caso contrário, a mensagem fica aqui **sem derrubar os outros sites** (regra de ouro).
+
+E na aba de logs do Worker (`wrangler tail`):
+
+```
+citado-indexer sweep (cron): [{"host":"citado.app.br","urls":8,"indexnow":"HTTP 202","bing":"HTTP 200","erro":null}, ...]
+```
 
 ## Deploy em 5 minutos
 
