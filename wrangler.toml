@@ -1,0 +1,16 @@
+# citado-indexer central — o relógio da rede Citado.
+# Varre toda semana os sites que NÃO têm o motor embutido (Pages/Vercel
+# estáticos): lê o sitemap, pinga IndexNow e reenvia o sitemap ao Bing.
+# Sites Worker (ex.: oficina306) têm motor próprio e ficam FORA da lista.
+name = "citado-indexer"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+workers_dev = true
+
+# segunda 07:30 UTC = 04:30 em Brasília
+[triggers]
+crons = ["30 7 * * 1"]
+
+# Secrets (nunca aqui):
+#   npx wrangler secret put BING_API_KEY   # reenvio de sitemap ao Bing
+#   npx wrangler secret put RUN_TOKEN      # dispara varredura manual via GET /run?token=...

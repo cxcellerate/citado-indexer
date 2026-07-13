@@ -1,0 +1,135 @@
+// citado-indexer central — mantém indexados os sites da rede Citado que não
+// têm o motor embutido (sites estáticos em Pages/Vercel, sem cron próprio).
+//
+// Toda segunda: para cada site da lista, lê o sitemap.xml, pinga IndexNow
+// com todas as URLs e reenvia o sitemap ao Bing Webmaster.
+// Regra de ouro (herdada do motor embutido): falha de um site não pode
+// derrubar a varredura dos demais — tudo em try/catch, resultado no log.
+
+interface Env {
+  BING_API_KEY?: string;
+  RUN_TOKEN?: string;
+}
+
+interface Site {
+  host: string; // host canônico (como servido, com www se for o caso)
+  sitemap: string;
+  indexnowKey: string; // pública por design — hospedada em https://<host>/<key>.txt
+  bingSiteUrl?: string; // como o site foi registrado no Bing Webmaster
+}
+
+// Sites Worker (oficina306 etc.) têm motor próprio embutido — não listar aqui.
+// gestaodecomanda.com.br FORA por ora: virou "Gestão de CMV" (domínio novo);
+// entra na lista depois do /indexar do domínio novo + redirect 301 do antigo.
+const SITES: Site[] = [
+  {
+    host: "citado.app.br",
+    sitemap: "https://citado.app.br/sitemap.xml",
+    indexnowKey: "fdede43aa2d7d414bc65b927ab0ef196",
+    bingSiteUrl: "https://citado.app.br",
+  },
+];
+
+interface SiteResult {
+  host: string;
+  urls: number;
+  indexnow: string;
+  bing: string;
+  erro: string | null;
+}
+
+async function sitemapUrls(site: Site): Promise<string[]> {
+  const res = await fetch(site.sitemap, { redirect: "follow" });
+  if (!res.ok) throw new Error(`sitemap HTTP ${res.status}`);
+  const xml = await res.text();
+  const urls = [...xml.matchAll(/<loc>\s*(.*?)\s*<\/loc>/g)].map((m) => m[1]);
+  if (!urls.length) throw new Error("sitemap sem <loc>");
+  return urls;
+}
+
+async function pingIndexNow(site: Site, urls: string[]): Promise<string> {
+  const res = await fetch("https://api.indexnow.org/indexnow", {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      host: site.host,
+      key: site.indexnowKey,
+      keyLocation: `https://${site.host}/${site.indexnowKey}.txt`,
+      urlList: urls,
+    }),
+  });
+  return `HTTP ${res.status}`;
+}
+
+async function resubmitBingSitemap(env: Env, site: Site): Promise<string> {
+  // .trim(): secrets colados via pipe no Windows podem carregar \r\n no fim
+  const key = env.BING_API_KEY?.trim();
+  if (!key) return "sem-chave";
+  if (!site.bingSiteUrl) return "nao-registrado";
+  const res = await fetch(
+    `https://ssl.bing.com/webmaster/api.svc/json/SubmitFeed?apikey=${key}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ siteUrl: site.bingSiteUrl, feedUrl: site.sitemap }),
+    },
+  );
+  return `HTTP ${res.status}`;
+}
+
+async function sweepSite(env: Env, site: Site): Promise<SiteResult> {
+  const r: SiteResult = { host: site.host, urls: 0, indexnow: "-", bing: "-", erro: null };
+  const erros: string[] = [];
+  let urls: string[] = [];
+  try {
+    urls = await sitemapUrls(site);
+    r.urls = urls.length;
+  } catch (e) {
+    erros.push(`sitemap: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  if (urls.length) {
+    try {
+      r.indexnow = await pingIndexNow(site, urls);
+    } catch (e) {
+      erros.push(`indexnow: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  try {
+    r.bing = await resubmitBingSitemap(env, site);
+  } catch (e) {
+    erros.push(`bing: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  r.erro = erros.length ? erros.join(" | ") : null;
+  return r;
+}
+
+async function runSweep(env: Env, origem: string): Promise<SiteResult[]> {
+  const resultados: SiteResult[] = [];
+  for (const site of SITES) {
+    resultados.push(await sweepSite(env, site));
+  }
+  console.log(`citado-indexer sweep (${origem}):`, JSON.stringify(resultados));
+  return resultados;
+}
+
+export default {
+  fetch: async (req: Request, env: Env): Promise<Response> => {
+    const url = new URL(req.url);
+    // disparo manual protegido: GET /run?token=<RUN_TOKEN>
+    if (url.pathname === "/run") {
+      if (!env.RUN_TOKEN || url.searchParams.get("token") !== env.RUN_TOKEN.trim()) {
+        return new Response("nao-autorizado", { status: 401 });
+      }
+      const resultados = await runSweep(env, "manual");
+      return Response.json({ ok: true, quando: new Date().toISOString(), resultados });
+    }
+    return new Response(
+      `citado-indexer central — ${SITES.length} site(s) na varredura semanal (segunda 04:30 Brasília)\n`,
+      { headers: { "Content-Type": "text/plain; charset=utf-8" } },
+    );
+  },
+
+  scheduled: (_event: ScheduledController, env: Env, ctx: ExecutionContext): void => {
+    ctx.waitUntil(runSweep(env, "cron"));
+  },
+};
