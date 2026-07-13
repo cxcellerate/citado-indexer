@@ -19,14 +19,21 @@ interface Site {
 }
 
 // Sites Worker (oficina306 etc.) têm motor próprio embutido — não listar aqui.
-// gestaodecomanda.com.br FORA por ora: virou "Gestão de CMV" (domínio novo);
-// entra na lista depois do /indexar do domínio novo + redirect 301 do antigo.
 const SITES: Site[] = [
   {
     host: "citado.app.br",
     sitemap: "https://citado.app.br/sitemap.xml",
     indexnowKey: "fdede43aa2d7d414bc65b927ab0ef196",
     bingSiteUrl: "https://citado.app.br",
+  },
+  {
+    // Gestão de CMV (site próprio, Vercel). Canônico = www (apex→www 308).
+    // /indexar rodado 13/07/2026. Domínio antigo gestaodecomanda.com.br
+    // sai de circulação após redirect 301 (manual na Vercel).
+    host: "www.gestaodecmv.com.br",
+    sitemap: "https://www.gestaodecmv.com.br/sitemap.xml",
+    indexnowKey: "41e52b1dc6e47bf54bbe129a43897531",
+    bingSiteUrl: "https://www.gestaodecmv.com.br",
   },
 ];
 
