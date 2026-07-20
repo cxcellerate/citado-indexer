@@ -35,6 +35,14 @@ const SITES: Site[] = [
     indexnowKey: "41e52b1dc6e47bf54bbe129a43897531",
     bingSiteUrl: "https://www.gestaodecmv.com.br",
   },
+  {
+    // Pilota IA (Worker próprio, mas indexação centralizada aqui por ora).
+    // Sitemap com 35 URLs; GSC/Bing verificados em 20/07/2026.
+    host: "pilotaia.com.br",
+    sitemap: "https://pilotaia.com.br/sitemap.xml",
+    indexnowKey: "214648bec61bc3126b5268eda364d0e0",
+    bingSiteUrl: "https://pilotaia.com.br",
+  },
 ];
 
 interface SiteResult {
