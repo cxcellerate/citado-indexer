@@ -43,6 +43,16 @@ const SITES: Site[] = [
     indexnowKey: "214648bec61bc3126b5268eda364d0e0",
     bingSiteUrl: "https://pilotaia.com.br",
   },
+  {
+    // CelebrantePRO (Next.js, Vercel). Canônico = www.
+    // sitemap.xml é um sitemap-index (aponta pra sitemap-0.xml); o parser
+    // deste worker só lê 1 nível de <loc>, então aponta direto pro
+    // sitemap-0.xml (as URLs reais) em vez do index.
+    // Ainda não registrado no Bing Webmaster — bingSiteUrl fica de fora até lá.
+    host: "www.celebrantepro.com.br",
+    sitemap: "https://www.celebrantepro.com.br/sitemap-0.xml",
+    indexnowKey: "dda33c9280b92011b13214bb58434a02",
+  },
 ];
 
 interface SiteResult {
