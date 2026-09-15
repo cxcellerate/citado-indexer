@@ -48,10 +48,11 @@ const SITES: Site[] = [
     // sitemap.xml é um sitemap-index (aponta pra sitemap-0.xml); o parser
     // deste worker só lê 1 nível de <loc>, então aponta direto pro
     // sitemap-0.xml (as URLs reais) em vez do index.
-    // Ainda não registrado no Bing Webmaster — bingSiteUrl fica de fora até lá.
+    // Verificado no Bing Webmaster em 15/09/2026 (meta tag msvalidate.01).
     host: "www.celebrantepro.com.br",
     sitemap: "https://www.celebrantepro.com.br/sitemap-0.xml",
     indexnowKey: "dda33c9280b92011b13214bb58434a02",
+    bingSiteUrl: "https://www.celebrantepro.com.br",
   },
 ];
 
